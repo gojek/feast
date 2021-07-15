@@ -52,6 +52,8 @@ def test_workflow() -> None:
         assertpy.assert_that(result.returncode).is_equal_to(0)
         result = runner.run(["feature-views", "list"], cwd=repo_path)
         assertpy.assert_that(result.returncode).is_equal_to(0)
+        result = runner.run(["feature-services", "list"], cwd=repo_path)
+        assertpy.assert_that(result.returncode).is_equal_to(0)
 
         # entity & feature view describe commands should succeed when objects exist
         result = runner.run(["entities", "describe", "driver"], cwd=repo_path)
@@ -60,11 +62,17 @@ def test_workflow() -> None:
             ["feature-views", "describe", "driver_locations"], cwd=repo_path
         )
         assertpy.assert_that(result.returncode).is_equal_to(0)
+        result = runner.run(
+            ["feature-services", "describe", "driver_locations_service"], cwd=repo_path
+        )
+        assertpy.assert_that(result.returncode).is_equal_to(0)
 
         # entity & feature view describe commands should fail when objects don't exist
         result = runner.run(["entities", "describe", "foo"], cwd=repo_path)
         assertpy.assert_that(result.returncode).is_equal_to(1)
         result = runner.run(["feature-views", "describe", "foo"], cwd=repo_path)
+        assertpy.assert_that(result.returncode).is_equal_to(1)
+        result = runner.run(["feature-services", "describe", "foo"], cwd=repo_path)
         assertpy.assert_that(result.returncode).is_equal_to(1)
 
         # Doing another apply should be a no op, and should not cause errors

@@ -12,6 +12,7 @@ import click
 from click.exceptions import BadParameter
 
 from feast import Entity, FeatureTable
+from feast.feature_service import FeatureService
 from feast.feature_view import FeatureView
 from feast.inference import (
     update_data_sources_with_inferred_event_timestamp_col,
@@ -36,6 +37,7 @@ class ParsedRepo(NamedTuple):
     feature_tables: List[FeatureTable]
     feature_views: List[FeatureView]
     entities: List[Entity]
+    feature_services: List[FeatureService]
 
 
 def read_feastignore(repo_root: Path) -> List[str]:
@@ -93,7 +95,9 @@ def get_repo_files(repo_root: Path) -> List[Path]:
 
 def parse_repo(repo_root: Path) -> ParsedRepo:
     """ Collect feature table definitions from feature repo """
-    res = ParsedRepo(feature_tables=[], entities=[], feature_views=[])
+    res = ParsedRepo(
+        feature_tables=[], entities=[], feature_views=[], feature_services=[]
+    )
 
     for repo_file in get_repo_files(repo_root):
         module_path = py_path_to_module(repo_file, repo_root)
@@ -107,7 +111,33 @@ def parse_repo(repo_root: Path) -> ParsedRepo:
                 res.feature_views.append(obj)
             elif isinstance(obj, Entity):
                 res.entities.append(obj)
+            elif isinstance(obj, FeatureService):
+                res.feature_services.append(obj)
     return res
+
+
+def apply_feature_services(registry: Registry, project: str, repo: ParsedRepo):
+    from colorama import Fore, Style
+
+    # Determine which Feature services should be deleted.
+    existing_feature_services = registry.list_feature_services(project)
+    for feature_service in repo.feature_services:
+        if feature_service in existing_feature_services:
+            existing_feature_services.remove(feature_service)
+
+    # The remaining Features services in the list should be deleted.
+    for feature_service_to_delete in existing_feature_services:
+        registry.delete_feature_service(feature_service_to_delete.name, project)
+        click.echo(
+            f"Deleted feature service {Style.BRIGHT + Fore.GREEN}{feature_service_to_delete.name}{Style.RESET_ALL} "
+            f"from registry"
+        )
+
+    for feature_service in repo.feature_services:
+        registry.apply_feature_service(feature_service, project=project)
+        click.echo(
+            f"Registered feature service {Style.BRIGHT + Fore.GREEN}{feature_service.name}{Style.RESET_ALL}"
+        )
 
 
 @log_exceptions_and_usage
@@ -188,12 +218,14 @@ def apply_total(repo_config: RepoConfig, repo_path: Path):
             f"Deleted feature view {Style.BRIGHT + Fore.GREEN}{registry_view.name}{Style.RESET_ALL} from registry"
         )
 
-    # Create views that should
+    # Create views that should exist
     for view in repo.feature_views:
         registry.apply_feature_view(view, project)
         click.echo(
             f"Registered feature view {Style.BRIGHT + Fore.GREEN}{view.name}{Style.RESET_ALL}"
         )
+
+    apply_feature_services(registry, project, repo)
 
     infra_provider = get_provider(repo_config, repo_path)
 

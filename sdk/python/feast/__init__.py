@@ -13,6 +13,7 @@ from .data_source import (
 )
 from .entity import Entity
 from .feature import Feature
+from .feature_service import FeatureService
 from .feature_store import FeatureStore
 from .feature_table import FeatureTable
 from .feature_view import FeatureView
@@ -40,6 +41,7 @@ __all__ = [
     "KinesisSource",
     "RedshiftSource",
     "Feature",
+    "FeatureService",
     "FeatureStore",
     "FeatureTable",
     "FeatureView",

@@ -16,7 +16,7 @@ Feature references are used for the retrieval of features from Feast:
 
 ```python
 online_features = fs.get_online_features(
-    feature_refs=[
+    features=[
         'driver_locations:lon',
         'drivers_activity:trips_today'
     ],
@@ -53,7 +53,7 @@ A collection of entity rows. Entity dataframes are the "left table" that is enri
 ```python
 training_df = store.get_historical_features(
     entity_df=entity_df, 
-    feature_refs = [
+    features = [
         'drivers_activity:trips_today'
         'drivers_activity:rating'
     ],

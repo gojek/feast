@@ -61,7 +61,7 @@ from feast import FeatureStore
 fs = FeatureStore(repo_path="path/to/your/feature/repo")
 
 training_df = fs.get_historical_features(
-    feature_refs=[
+    features=[
         "driver_hourly_stats:conv_rate",
         "driver_hourly_stats:acc_rate"
     ],

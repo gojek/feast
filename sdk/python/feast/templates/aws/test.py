@@ -27,8 +27,7 @@ def main():
 
     # Retrieve features from the online store (DynamoDB)
     online_features = fs.get_online_features(
-        feature_refs=feature_refs,
-        entity_rows=[{"driver_id": 1001}, {"driver_id": 1002}],
+        features=feature_refs, entity_rows=[{"driver_id": 1001}, {"driver_id": 1002}],
     ).to_dict()
 
     print(pd.DataFrame.from_dict(online_features))

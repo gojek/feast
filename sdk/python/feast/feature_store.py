@@ -15,7 +15,7 @@ import os
 from collections import Counter, OrderedDict, defaultdict
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
 import pandas as pd
 from colorama import Fore, Style
@@ -24,6 +24,7 @@ from tqdm import tqdm
 from feast import utils
 from feast.entity import Entity
 from feast.errors import FeatureNameCollisionError, FeatureViewNotFoundException
+from feast.feature_service import FeatureService
 from feast.feature_table import FeatureTable
 from feast.feature_view import FeatureView
 from feast.inference import (
@@ -131,6 +132,17 @@ class FeatureStore:
         return self._registry.list_entities(self.project, allow_cache=allow_cache)
 
     @log_exceptions_and_usage
+    def list_feature_services(self) -> List[FeatureService]:
+        """
+        Retrieve a list of feature services from the registry
+
+        Returns:
+            List of feature services
+        """
+
+        return self._registry.list_feature_services(self.project)
+
+    @log_exceptions_and_usage
     def list_feature_views(self) -> List[FeatureView]:
         """
         Retrieve a list of feature views from the registry
@@ -155,6 +167,21 @@ class FeatureStore:
         """
 
         return self._registry.get_entity(name, self.project)
+
+    @log_exceptions_and_usage
+    def get_feature_service(self, name: str) -> FeatureService:
+        """
+        Retrieves a feature service.
+
+        Args:
+            name: Name of FeatureService
+
+        Returns:
+            Returns either the specified FeatureService, or raises an exception if
+            none is found
+        """
+
+        return self._registry.get_feature_service(name, self.project)
 
     @log_exceptions_and_usage
     def get_feature_view(self, name: str) -> FeatureView:
@@ -182,9 +209,34 @@ class FeatureStore:
 
         return self._registry.delete_feature_view(name, self.project)
 
+    def _get_features(
+        self,
+        features: Union[List[str], FeatureService],
+        feature_refs: Optional[List[str]],
+    ) -> List[str]:
+        _features = features or feature_refs
+        if not _features:
+            raise ValueError("No features specified for retrieval")
+
+        _feature_refs: List[str]
+        if isinstance(_features, FeatureService):
+            # Get the latest value of the feature service, in case the object passed in has been updated underneath us.
+            _feature_refs = _get_features_refs_from_feature_services(
+                self.get_feature_service(_features.name)
+            )
+        else:
+            _feature_refs = _features
+        return _feature_refs
+
     @log_exceptions_and_usage
     def apply(
-        self, objects: Union[Entity, FeatureView, List[Union[FeatureView, Entity]]]
+        self,
+        objects: Union[
+            Entity,
+            FeatureView,
+            FeatureService,
+            List[Union[FeatureView, Entity, FeatureService]],
+        ],
     ):
         """Register objects to metadata store and update related infrastructure.
 
@@ -194,8 +246,7 @@ class FeatureStore:
         operations are idempotent, meaning they can safely be rerun.
 
         Args:
-            objects (List[Union[FeatureView, Entity]]): A list of FeatureView or Entity objects that should be
-                registered
+            objects: A single object, or a list of objects that should be registered with the Feature Store.
 
         Examples:
             Register a single Entity and FeatureView.
@@ -219,12 +270,14 @@ class FeatureStore:
         # TODO: Add locking
         # TODO: Optimize by only making a single call (read/write)
 
-        if isinstance(objects, Entity) or isinstance(objects, FeatureView):
+        if not isinstance(objects, Iterable):
             objects = [objects]
+
         assert isinstance(objects, list)
 
         views_to_update = [ob for ob in objects if isinstance(ob, FeatureView)]
         entities_to_update = [ob for ob in objects if isinstance(ob, Entity)]
+        services_to_update = [ob for ob in objects if isinstance(ob, FeatureService)]
 
         # Make inferences
         update_entities_with_inferred_types_from_feature_views(
@@ -238,13 +291,17 @@ class FeatureStore:
         for view in views_to_update:
             view.infer_features_from_input_source(self.config)
 
-        if len(views_to_update) + len(entities_to_update) != len(objects):
+        if len(views_to_update) + len(entities_to_update) + len(
+            services_to_update
+        ) != len(objects):
             raise ValueError("Unknown object type provided as part of apply() call")
 
         for view in views_to_update:
             self._registry.apply_feature_view(view, project=self.project)
         for ent in entities_to_update:
             self._registry.apply_entity(ent, project=self.project)
+        for feature_service in services_to_update:
+            self._registry.apply_feature_service(feature_service, project=self.project)
 
         self._get_provider().update_infra(
             project=self.project,
@@ -276,7 +333,8 @@ class FeatureStore:
     def get_historical_features(
         self,
         entity_df: Union[pd.DataFrame, str],
-        feature_refs: List[str],
+        features: Union[List[str], FeatureService],
+        feature_refs: Optional[List[str]] = None,
         full_feature_names: bool = False,
     ) -> RetrievalJob:
         """Enrich an entity dataframe with historical feature values for either training or batch scoring.
@@ -297,8 +355,9 @@ class FeatureStore:
                 columns (e.g., customer_id, driver_id) on which features need to be joined, as well as a event_timestamp
                 column used to ensure point-in-time correctness. Either a Pandas DataFrame can be provided or a string
                 SQL query. The query must be of a format supported by the configured offline store (e.g., BigQuery)
-            feature_refs: A list of features that should be retrieved from the offline store. Feature references are of
-                the format "feature_view:feature", e.g., "customer_fv:daily_transactions".
+            features: A list of features, that should be retrieved from the offline store.
+                Either a list of string feature references can be provided or a FeatureService object.
+                Feature references are of the format "feature_view:feature", e.g., "customer_fv:daily_transactions".
             full_feature_names: A boolean that provides the option to add the feature view prefixes to the feature names,
                 changing them from the format "feature" to "feature_view__feature" (e.g., "daily_transactions" changes to
                 "customer_fv__daily_transactions"). By default, this value is set to False.
@@ -314,24 +373,27 @@ class FeatureStore:
             >>> fs = FeatureStore(config=RepoConfig(provider="gcp"))
             >>> retrieval_job = fs.get_historical_features(
             >>>     entity_df="SELECT event_timestamp, order_id, customer_id from gcp_project.my_ds.customer_orders",
-            >>>     feature_refs=["customer:age", "customer:avg_orders_1d", "customer:avg_orders_7d"],
-            >>>     )
+            >>>     features=["customer:age", "customer:avg_orders_1d", "customer:avg_orders_7d"]
+            >>> )
             >>> feature_data = retrieval_job.to_df()
             >>> model.fit(feature_data) # insert your modeling framework here.
         """
-        all_feature_views = self._registry.list_feature_views(project=self.project)
 
-        _validate_feature_refs(feature_refs, full_feature_names)
+        _feature_refs = self._get_features(features, feature_refs)
+
+        all_feature_views = self._registry.list_feature_views(project=self.project)
         feature_views = list(
-            view for view, _ in _group_feature_refs(feature_refs, all_feature_views)
+            view for view, _ in _group_feature_refs(_feature_refs, all_feature_views)
         )
+
+        _validate_feature_refs(_feature_refs, full_feature_names)
 
         provider = self._get_provider()
 
         job = provider.get_historical_features(
             self.config,
             feature_views,
-            feature_refs,
+            _feature_refs,
             entity_df,
             self._registry,
             self.project,
@@ -503,8 +565,9 @@ class FeatureStore:
     @log_exceptions_and_usage
     def get_online_features(
         self,
-        feature_refs: List[str],
+        features: Union[List[str], FeatureService],
         entity_rows: List[Dict[str, Any]],
+        feature_refs: Optional[List[str]] = None,
         full_feature_names: bool = False,
     ) -> OnlineResponse:
         """
@@ -519,7 +582,7 @@ class FeatureStore:
         infinity (cache forever).
 
         Args:
-            feature_refs: List of feature references that will be returned for each entity.
+            features: List of feature references that will be returned for each entity.
                 Each feature reference should have the following format:
                 "feature_table:feature" where "feature_table" & "feature" refer to
                 the feature and feature table names respectively.
@@ -540,6 +603,8 @@ class FeatureStore:
             >>> print(online_response_dict)
             {'sales:daily_transactions': [1.1,1.2], 'sales:customer_id': [0,1]}
         """
+
+        _feature_refs = self._get_features(features, feature_refs)
 
         provider = self._get_provider()
         entities = self.list_entities(allow_cache=True)
@@ -573,8 +638,8 @@ class FeatureStore:
             project=self.project, allow_cache=True
         )
 
-        _validate_feature_refs(feature_refs, full_feature_names)
-        grouped_refs = _group_feature_refs(feature_refs, all_feature_views)
+        _validate_feature_refs(_feature_refs, full_feature_names)
+        grouped_refs = _group_feature_refs(_feature_refs, all_feature_views)
         for table, requested_features in grouped_refs:
             entity_keys = _get_table_entity_keys(
                 table, union_of_entity_keys, entity_name_to_join_key_map
@@ -619,7 +684,7 @@ class FeatureStore:
 
 def _entity_row_to_key(row: GetOnlineFeaturesRequestV2.EntityRow) -> EntityKeyProto:
     names, values = zip(*row.fields.items())
-    return EntityKeyProto(join_keys=names, entity_values=values)  # type: ignore
+    return EntityKeyProto(join_keys=names, entity_values=values)
 
 
 def _entity_row_to_field_values(
@@ -658,7 +723,7 @@ def _validate_feature_refs(feature_refs: List[str], full_feature_names: bool = F
 
 
 def _group_feature_refs(
-    feature_refs: List[str], all_feature_views: List[FeatureView]
+    features: Union[List[str], FeatureService], all_feature_views: List[FeatureView]
 ) -> List[Tuple[FeatureView, List[str]]]:
     """ Get list of feature views and corresponding feature names based on feature references"""
 
@@ -668,17 +733,36 @@ def _group_feature_refs(
     # view name to feature names
     views_features = defaultdict(list)
 
-    for ref in feature_refs:
-        view_name, feat_name = ref.split(":")
+    if isinstance(features, list) and isinstance(features[0], str):
+        for ref in features:
+            view_name, feat_name = ref.split(":")
+            if view_name not in view_index:
+                raise FeatureViewNotFoundException(view_name)
+            views_features[view_name].append(feat_name)
+    elif isinstance(features, FeatureService):
+        for feature_projection in features.features:
+            projected_features = feature_projection.features
+            views_features[feature_projection.name].extend(
+                [f.name for f in projected_features]
+            )
 
-        if view_name not in view_index:
-            raise FeatureViewNotFoundException(view_name)
-        views_features[view_name].append(feat_name)
+    print(f"Views Features: {views_features}")
 
     result = []
     for view_name, feature_names in views_features.items():
         result.append((view_index[view_name], feature_names))
     return result
+
+
+def _get_features_refs_from_feature_services(
+    feature_service: FeatureService,
+) -> List[str]:
+    feature_refs = []
+    for projection in feature_service.features:
+        feature_refs.extend(
+            [f"{projection.name}:{f.name}" for f in projection.features]
+        )
+    return feature_refs
 
 
 def _get_table_entity_keys(

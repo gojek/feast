@@ -94,7 +94,7 @@ def test_online() -> None:
 
         # Retrieve two features using two keys, one valid one non-existing
         result = store.get_online_features(
-            feature_refs=[
+            features=[
                 "driver_locations:lon",
                 "customer_profile:avg_orders_day",
                 "customer_profile:name",
@@ -116,7 +116,7 @@ def test_online() -> None:
 
         # Ensure features are still in result when keys not found
         result = store.get_online_features(
-            feature_refs=["customer_driver_combined:trips"],
+            features=["customer_driver_combined:trips"],
             entity_rows=[{"driver": 0, "customer": 0}],
             full_feature_names=False,
         ).to_dict()
@@ -126,7 +126,7 @@ def test_online() -> None:
         # invalid table reference
         with pytest.raises(FeatureViewNotFoundException):
             store.get_online_features(
-                feature_refs=["driver_locations_bad:lon"],
+                features=["driver_locations_bad:lon"],
                 entity_rows=[{"driver": 1}],
                 full_feature_names=False,
             )
@@ -146,7 +146,7 @@ def test_online() -> None:
 
         # Should download the registry and cache it permanently (or until manually refreshed)
         result = fs_fast_ttl.get_online_features(
-            feature_refs=[
+            features=[
                 "driver_locations:lon",
                 "customer_profile:avg_orders_day",
                 "customer_profile:name",
@@ -167,7 +167,7 @@ def test_online() -> None:
         # Will try to reload registry because it has expired (it will fail because we deleted the actual registry file)
         with pytest.raises(FileNotFoundError):
             fs_fast_ttl.get_online_features(
-                feature_refs=[
+                features=[
                     "driver_locations:lon",
                     "customer_profile:avg_orders_day",
                     "customer_profile:name",
@@ -182,7 +182,7 @@ def test_online() -> None:
 
         # Test if registry is actually reloaded and whether results return
         result = fs_fast_ttl.get_online_features(
-            feature_refs=[
+            features=[
                 "driver_locations:lon",
                 "customer_profile:avg_orders_day",
                 "customer_profile:name",
@@ -208,7 +208,7 @@ def test_online() -> None:
 
         # Should return results (and fill the registry cache)
         result = fs_infinite_ttl.get_online_features(
-            feature_refs=[
+            features=[
                 "driver_locations:lon",
                 "customer_profile:avg_orders_day",
                 "customer_profile:name",
@@ -228,7 +228,7 @@ def test_online() -> None:
 
         # TTL is infinite so this method should use registry cache
         result = fs_infinite_ttl.get_online_features(
-            feature_refs=[
+            features=[
                 "driver_locations:lon",
                 "customer_profile:avg_orders_day",
                 "customer_profile:name",
@@ -359,7 +359,7 @@ def test_online_to_df():
 
         # Get online features in dataframe
         result_df = store.get_online_features(
-            feature_refs=[
+            features=[
                 "driver_locations:lon",
                 "driver_locations:lat",
                 "customer_profile:avg_orders_day",

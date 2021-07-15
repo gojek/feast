@@ -27,7 +27,7 @@ def _assert_online_features(
     """Assert that features in online store are up to date with `max_date` date."""
     # Read features back
     result = store.get_online_features(
-        feature_refs=[
+        features=[
             "driver_hourly_stats:conv_rate",
             "driver_hourly_stats:avg_daily_trips",
         ],

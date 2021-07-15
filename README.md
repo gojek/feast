@@ -62,7 +62,7 @@ store = FeatureStore(repo_path=".")
 
 training_df = store.get_historical_features(
     entity_df=entity_df, 
-    feature_refs = [
+    features = [
         'driver_hourly_stats:conv_rate',
         'driver_hourly_stats:acc_rate',
         'driver_hourly_stats:avg_daily_trips'
@@ -101,7 +101,7 @@ from feast import FeatureStore
 store = FeatureStore(repo_path=".")
 
 feature_vector = store.get_online_features(
-    feature_refs=[
+    features=[
         'driver_hourly_stats:conv_rate',
         'driver_hourly_stats:acc_rate',
         'driver_hourly_stats:avg_daily_trips'

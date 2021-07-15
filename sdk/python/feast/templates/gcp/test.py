@@ -18,7 +18,7 @@ def main():
     fs.apply([driver, driver_stats_fv])
 
     # Select features
-    feature_refs = ["driver_hourly_stats:conv_rate", "driver_hourly_stats:acc_rate"]
+    features = ["driver_hourly_stats:conv_rate", "driver_hourly_stats:acc_rate"]
 
     # Create an entity dataframe. This is the dataframe that will be enriched with historical features
     entity_df = pd.DataFrame(
@@ -39,7 +39,7 @@ def main():
 
     # Retrieve historical features by joining the entity dataframe to the BigQuery table source
     training_df = fs.get_historical_features(
-        feature_refs=feature_refs, entity_df=entity_df
+        features=features, entity_df=entity_df
     ).to_df()
 
     print()
@@ -54,8 +54,7 @@ def main():
 
     # Retrieve features from the online store (Firestore)
     online_features = fs.get_online_features(
-        feature_refs=feature_refs,
-        entity_rows=[{"driver_id": 1001}, {"driver_id": 1002}],
+        features=features, entity_rows=[{"driver_id": 1001}, {"driver_id": 1002}],
     ).to_dict()
 
     print()

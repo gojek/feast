@@ -311,7 +311,7 @@ def test_historical_features_from_parquet_sources(
 
         job = store.get_historical_features(
             entity_df=orders_df,
-            feature_refs=[
+            features=[
                 "driver_stats:conv_rate",
                 "driver_stats:avg_daily_trips",
                 "customer_profile:current_balance",
@@ -472,7 +472,7 @@ def test_historical_features_from_bigquery_sources(
 
         job_from_sql = store.get_historical_features(
             entity_df=entity_df_query,
-            feature_refs=[
+            features=[
                 "driver_stats:conv_rate",
                 "driver_stats:avg_daily_trips",
                 "customer_profile:current_balance",
@@ -525,7 +525,7 @@ def test_historical_features_from_bigquery_sources(
             errors.FeastEntityDFMissingColumnsError
         ).when_called_with(
             entity_df=entity_df_query_with_invalid_join_key,
-            feature_refs=[
+            features=[
                 "driver_stats:conv_rate",
                 "driver_stats:avg_daily_trips",
                 "customer_profile:current_balance",
@@ -536,7 +536,7 @@ def test_historical_features_from_bigquery_sources(
 
         job_from_df = store.get_historical_features(
             entity_df=orders_df,
-            feature_refs=[
+            features=[
                 "driver_stats:conv_rate",
                 "driver_stats:avg_daily_trips",
                 "customer_profile:current_balance",
@@ -554,7 +554,7 @@ def test_historical_features_from_bigquery_sources(
             errors.FeastEntityDFMissingColumnsError
         ).when_called_with(
             entity_df=orders_df_with_invalid_join_key,
-            feature_refs=[
+            features=[
                 "driver_stats:conv_rate",
                 "driver_stats:avg_daily_trips",
                 "customer_profile:current_balance",

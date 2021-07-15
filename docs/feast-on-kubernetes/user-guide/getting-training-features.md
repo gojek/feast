@@ -8,7 +8,7 @@ Below is an example of the process required to produce a training dataset:
 
 ```python
 # Feature references with target feature
-feature_refs = [
+features = [
     "driver_trips:average_daily_rides",
     "driver_trips:maximum_daily_rides",
     "driver_trips:rating",
@@ -24,7 +24,7 @@ entity_source = FileSource(
 
 # Retrieve historical dataset from Feast.
 historical_feature_retrieval_job = client.get_historical_features(
-    feature_refs=feature_refs,
+    features=features,
     entity_rows=entity_source
 )
 
