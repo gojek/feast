@@ -96,6 +96,12 @@ def test_apply_entity_success(test_registry):
         and entity.labels["team"] == "matchmaking"
     )
 
+    test_registry.teardown()
+
+    # Will try to reload registry, which will fail because the file has been deleted
+    with pytest.raises(FileNotFoundError):
+        test_registry._get_registry_proto()
+
 
 @pytest.mark.integration
 @pytest.mark.parametrize(
@@ -134,6 +140,12 @@ def test_apply_entity_integration(test_registry):
         and "team" in entity.labels
         and entity.labels["team"] == "matchmaking"
     )
+
+    test_registry.teardown()
+
+    # Will try to reload registry, which will fail because the file has been deleted
+    with pytest.raises(FileNotFoundError):
+        test_registry._get_registry_proto()
 
 
 @pytest.mark.parametrize(

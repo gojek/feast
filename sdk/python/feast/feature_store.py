@@ -267,10 +267,7 @@ class FeatureStore:
         entities = self.list_entities()
 
         self._get_provider().teardown_infra(self.project, tables, entities)
-        for feature_view in feature_views:
-            self.delete_feature_view(feature_view.name)
-        for feature_table in feature_tables:
-            self._registry.delete_feature_table(feature_table.name, self.project)
+        self._registry.teardown()
 
     @log_exceptions_and_usage
     def get_historical_features(

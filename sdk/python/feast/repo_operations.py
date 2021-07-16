@@ -259,6 +259,7 @@ def teardown(repo_config: RepoConfig, repo_path: Path):
     infra_provider.teardown_infra(
         project, tables=registry_tables, entities=registry_entities
     )
+    registry.teardown()
 
 
 @log_exceptions_and_usage

@@ -21,6 +21,8 @@ from tempfile import TemporaryFile
 from typing import List, Optional
 from urllib.parse import urlparse
 
+from google.cloud.exceptions import NotFound
+
 from feast.entity import Entity
 from feast.errors import (
     EntityNotFoundException,
@@ -399,6 +401,10 @@ class Registry:
         """Refreshes the state of the registry cache by fetching the registry state from the remote registry store."""
         self._get_registry_proto(allow_cache=False)
 
+    def teardown(self):
+        """Tears down all local and cloud resources."""
+        self._registry_store.teardown()
+
     def _prepare_registry_for_changes(self):
         """Prepares the Registry for changes by refreshing the cache if necessary."""
         try:
@@ -472,6 +478,13 @@ class RegistryStore(ABC):
         """
         pass
 
+    @abstractmethod
+    def teardown(self):
+        """
+        Tear down all resources.
+        """
+        pass
+
 
 class LocalRegistryStore(RegistryStore):
     def __init__(self, repo_path: Path, registry_path_string: str):
@@ -492,6 +505,15 @@ class LocalRegistryStore(RegistryStore):
 
     def update_registry_proto(self, registry_proto: RegistryProto):
         self._write_registry(registry_proto)
+        return
+
+    def teardown(self):
+        try:
+            self._filepath.unlink()
+        except FileNotFoundError:
+            # If the file deletion fails with FileNotFoundError, the file has already
+            # been deleted.
+            pass
         return
 
     def _write_registry(self, registry_proto: RegistryProto):
@@ -543,6 +565,15 @@ class GCSRegistryStore(RegistryStore):
 
     def update_registry_proto(self, registry_proto: RegistryProto):
         self._write_registry(registry_proto)
+        return
+
+    def teardown(self):
+        gs_bucket = self.gcs_client.get_bucket(self._bucket)
+        try:
+            gs_bucket.delete_blob(self._blob)
+        except NotFound:
+            # If the blob deletion fails with NotFound, it has already been deleted.
+            pass
         return
 
     def _write_registry(self, registry_proto: RegistryProto):
@@ -608,6 +639,10 @@ class S3RegistryStore(RegistryStore):
 
     def update_registry_proto(self, registry_proto: RegistryProto):
         self._write_registry(registry_proto)
+        return
+
+    def teardown(self):
+        self.s3_client.Object(self._bucket, self._key).delete()
         return
 
     def _write_registry(self, registry_proto: RegistryProto):
