@@ -115,7 +115,9 @@ def config_with_missing_variable():
 
 @patch(
     "requests.post",
-    return_value=MockResponse({"access_token": "mock_token"}, HTTPStatus.OK),
+    return_value=MockResponse(
+        {"access_token": "mock_token", "expires_in": 2000}, HTTPStatus.OK
+    ),
 )
 def test_get_auth_metadata_plugin_oauth_should_pass(post, config_oauth):
     auth_metadata_plugin = get_auth_metadata_plugin(config_oauth)

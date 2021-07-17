@@ -69,6 +69,8 @@ class OAuthMetadataPlugin(grpc.AuthMetadataPlugin):
 
         self._static_token = None
         self._token = None
+        self._config = config
+        self._token_expiry_ts = 0
 
         # If provided, set a static token
         if config.exists(opt.AUTH_TOKEN):
@@ -92,6 +94,11 @@ class OAuthMetadataPlugin(grpc.AuthMetadataPlugin):
 
     def get_signed_meta(self):
         """ Creates a signed authorization metadata token."""
+
+        current_time = time.time()
+        if current_time > (self._token_expiry_ts - 500):
+            self._refresh_token(self._config)
+            self._token_expiry_ts = current_time + self._token_expiry_ts
         return (("authorization", "Bearer {}".format(self._token)),)
 
     def _refresh_token(self, config: Config):
@@ -117,6 +124,7 @@ class OAuthMetadataPlugin(grpc.AuthMetadataPlugin):
         )
         if response_token.status_code == HTTPStatus.OK:
             self._token = response_token.json().get("access_token")
+            self._token_expiry_ts = response_token.json().get("expires_in")
         else:
             raise RuntimeError(
                 f"Could not fetch OAuth token, got response : {response_token.status_code}"
