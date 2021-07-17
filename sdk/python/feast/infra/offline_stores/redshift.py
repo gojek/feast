@@ -104,6 +104,20 @@ class RedshiftOfflineStore(OfflineStore):
     ) -> RetrievalJob:
         pass
 
+    @staticmethod
+    def get_historical_features_by_view(
+        config: RepoConfig,
+        feature_views: List[FeatureView],
+        feature_refs: List[str],
+        entity_df: Union[pd.DataFrame, str],
+        registry: Registry,
+        project: str,
+        start_date: Optional[datetime],
+        end_date: Optional[datetime],
+        full_feature_names: bool,
+    ):
+        pass
+
 
 class RedshiftRetrievalJob(RetrievalJob):
     def __init__(self, query: str, redshift_client, s3_resource, config: RepoConfig):
