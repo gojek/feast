@@ -345,6 +345,8 @@ def test_historical_features_from_parquet_sources(
             ).reset_index(drop=True),
         )
 
+        store.teardown()
+
 
 @pytest.mark.integration
 @pytest.mark.parametrize(
@@ -596,6 +598,8 @@ def test_historical_features_from_bigquery_sources(
         assert_frame_equal(
             actual_df_from_df_entities, table_from_df_entities.to_pandas()
         )
+
+        store.teardown()
 
 
 @pytest.mark.integration
