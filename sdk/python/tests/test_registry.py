@@ -215,6 +215,12 @@ def test_apply_feature_view_success(test_registry):
     feature_views = test_registry.list_feature_views(project)
     assert len(feature_views) == 0
 
+    test_registry.teardown()
+
+    # Will try to reload registry, which will fail because the file has been deleted
+    with pytest.raises(FileNotFoundError):
+        test_registry._get_registry_proto()
+
 
 @pytest.mark.integration
 @pytest.mark.parametrize(
@@ -283,6 +289,12 @@ def test_apply_feature_view_integration(test_registry):
     test_registry.delete_feature_view("my_feature_view_1", project)
     feature_views = test_registry.list_feature_views(project)
     assert len(feature_views) == 0
+
+    test_registry.teardown()
+
+    # Will try to reload registry, which will fail because the file has been deleted
+    with pytest.raises(FileNotFoundError):
+        test_registry._get_registry_proto()
 
 
 def test_commit():
@@ -357,3 +369,9 @@ def test_commit():
         and "team" in entity.labels
         and entity.labels["team"] == "matchmaking"
     )
+
+    test_registry.teardown()
+
+    # Will try to reload registry, which will fail because the file has been deleted
+    with pytest.raises(FileNotFoundError):
+        test_registry._get_registry_proto()
