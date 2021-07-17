@@ -223,6 +223,7 @@ class FeatureStore:
         assert isinstance(objects, list)
 
         views_to_update = [ob for ob in objects if isinstance(ob, FeatureView)]
+        _validate_feature_views(views_to_update)
         entities_to_update = [ob for ob in objects if isinstance(ob, Entity)]
 
         # Make inferences
@@ -733,3 +734,15 @@ def _print_materialization_log(
             f" to {Style.BRIGHT + Fore.GREEN}{end_date.replace(microsecond=0).astimezone()}{Style.RESET_ALL}"
             f" into the {Style.BRIGHT + Fore.GREEN}{online_store}{Style.RESET_ALL} online store.\n"
         )
+
+
+def _validate_feature_views(feature_views: List[FeatureView]):
+    """ Verify feature views have unique names"""
+    name_to_fv_dict = {}
+    for fv in feature_views:
+        if fv.name in name_to_fv_dict:
+            raise ValueError(
+                f"More than one feature view with name {fv.name} found. Please ensure that all feature view names are unique."
+            )
+        else:
+            name_to_fv_dict[fv.name] = fv

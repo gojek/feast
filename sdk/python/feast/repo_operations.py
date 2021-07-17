@@ -12,6 +12,7 @@ import click
 from click.exceptions import BadParameter
 
 from feast import Entity, FeatureTable
+from feast.feature_store import _validate_feature_views
 from feast.feature_view import FeatureView
 from feast.inference import (
     update_data_sources_with_inferred_event_timestamp_col,
@@ -94,11 +95,9 @@ def get_repo_files(repo_root: Path) -> List[Path]:
 def parse_repo(repo_root: Path) -> ParsedRepo:
     """ Collect feature table definitions from feature repo """
     res = ParsedRepo(feature_tables=[], entities=[], feature_views=[])
-
     for repo_file in get_repo_files(repo_root):
         module_path = py_path_to_module(repo_file, repo_root)
         module = importlib.import_module(module_path)
-
         for attr_name in dir(module):
             obj = getattr(module, attr_name)
             if isinstance(obj, FeatureTable):
@@ -131,6 +130,7 @@ def apply_total(repo_config: RepoConfig, repo_path: Path, skip_source_validation
     registry._initialize_registry()
     sys.dont_write_bytecode = True
     repo = parse_repo(repo_path)
+    _validate_feature_views(repo.feature_views)
     data_sources = [t.input for t in repo.feature_views]
 
     if not skip_source_validation:
