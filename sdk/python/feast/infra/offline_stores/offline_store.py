@@ -75,3 +75,17 @@ class OfflineStore(ABC):
         full_feature_names: bool = False,
     ) -> RetrievalJob:
         pass
+
+    @staticmethod
+    def get_historical_features_by_view(
+        config: RepoConfig,
+        feature_views: List[FeatureView],
+        feature_refs: List[str],
+        entity_df: Union[pd.DataFrame, str],
+        registry: Registry,
+        project: str,
+        start_date: Optional[datetime],
+        end_date: Optional[datetime],
+        full_feature_names: bool,
+    ):
+        pass

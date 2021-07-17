@@ -142,6 +142,30 @@ class LocalProvider(Provider):
             full_feature_names=full_feature_names,
         )
 
+    def get_historical_features_by_view(
+        self,
+        config: RepoConfig,
+        feature_views: List[FeatureView],
+        feature_refs: List[str],
+        entity_df: Union[pd.DataFrame, str],
+        registry: Registry,
+        project: str,
+        start_date: Optional[datetime],
+        end_date: Optional[datetime],
+        full_feature_names: bool,
+    ) -> RetrievalJob:
+        return self.offline_store.get_historical_features_by_view(
+            config=config,
+            feature_views=feature_views,
+            feature_refs=feature_refs,
+            entity_df=entity_df,
+            registry=registry,
+            project=project,
+            start_date=start_date,
+            end_date=end_date,
+            full_feature_names=full_feature_names,
+        )
+
 
 def _table_id(project: str, table: Union[FeatureTable, FeatureView]) -> str:
     return f"{project}_{table.name}"

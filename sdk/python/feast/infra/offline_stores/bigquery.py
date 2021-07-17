@@ -152,6 +152,20 @@ class BigQueryOfflineStore(OfflineStore):
         job = BigQueryRetrievalJob(query=query, client=client, config=config)
         return job
 
+    @staticmethod
+    def get_historical_features_by_view(
+        config: RepoConfig,
+        feature_views: List[FeatureView],
+        feature_refs: List[str],
+        entity_df: Union[pandas.DataFrame, str],
+        registry: Registry,
+        project: str,
+        start_date: Optional[datetime],
+        end_date: Optional[datetime],
+        full_feature_names: bool,
+    ):
+        raise NotImplementedError
+
 
 def _assert_expected_columns_in_dataframe(
     join_keys: Set[str], entity_df_event_timestamp_col: str, entity_df: pandas.DataFrame

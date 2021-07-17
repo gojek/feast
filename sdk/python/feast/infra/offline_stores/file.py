@@ -7,7 +7,10 @@ import pytz
 from pydantic.typing import Literal
 
 from feast.data_source import DataSource, FileSource
-from feast.errors import FeastJoinKeysDuringMaterialization
+from feast.errors import (
+    FeastJoinKeysDuringMaterialization,
+    FeatureViewNotFoundException,
+)
 from feast.feature_view import FeatureView
 from feast.infra.offline_stores.offline_store import OfflineStore, RetrievalJob
 from feast.infra.provider import (
@@ -209,6 +212,88 @@ class FileOfflineStore(OfflineStore):
 
         job = FileRetrievalJob(evaluation_function=evaluate_historical_retrieval)
         return job
+
+    @staticmethod
+    def get_historical_features_by_view(
+        config: RepoConfig,
+        feature_views: List[FeatureView],
+        feature_refs: List[str],
+        entity_df: Union[pd.DataFrame, str],
+        registry: Registry,
+        project: str,
+        start_date: Optional[datetime],
+        end_date: Optional[datetime],
+        full_feature_names: bool,
+    ):
+        if not (isinstance(entity_df, pd.DataFrame) or isinstance(entity_df, str)):
+            raise ValueError(
+                f"Please provide an entity_df of type {type(pd.DataFrame)} or {type(str)} instead of type {type(entity_df)}"
+            )
+
+        if isinstance(entity_df, str):
+            for feature_view in feature_views:
+                assert isinstance(feature_view.input, FileSource)
+                if feature_view.name == entity_df:
+                    join_keys = []
+                    for entity_name in feature_view.entities:
+                        entity = registry.get_entity(entity_name, project)
+                        join_keys.append(entity.join_key)
+
+                    columns = join_keys + [feature_view.input.event_timestamp_column]
+                    entity_df = pyarrow.parquet.read_table(
+                        feature_view.input.path, columns=columns
+                    ).to_pandas()
+                    entity_df.rename(
+                        columns={
+                            feature_view.input.event_timestamp_column: DEFAULT_ENTITY_DF_EVENT_TIMESTAMP_COL
+                        },
+                        inplace=True,
+                    )
+                    break
+            else:
+                raise FeatureViewNotFoundException(entity_df)
+
+        entity_df_event_timestamp_col = DEFAULT_ENTITY_DF_EVENT_TIMESTAMP_COL  # local modifiable copy of global variable
+        if entity_df_event_timestamp_col not in entity_df.columns:
+            datetime_columns = entity_df.select_dtypes(
+                include=["datetime", "datetimetz"]
+            ).columns
+            if len(datetime_columns) == 1:
+                print(
+                    f"Using {datetime_columns[0]} as the event timestamp. To specify a column explicitly, please name it {DEFAULT_ENTITY_DF_EVENT_TIMESTAMP_COL}."
+                )
+                entity_df_event_timestamp_col = datetime_columns[0]
+            else:
+                raise Exception(
+                    f"Please provide an entity_df with a column named {DEFAULT_ENTITY_DF_EVENT_TIMESTAMP_COL} representing the time of events."
+                )
+
+        # Convert event timestamp column to datetime and normalize time zone to UTC
+        entity_df[entity_df_event_timestamp_col] = pd.to_datetime(
+            entity_df[entity_df_event_timestamp_col], utc=True
+        )
+
+        if start_date is not None and end_date is not None:
+            start_date = pd.to_datetime(start_date, utc=True)
+            end_date = pd.to_datetime(end_date, utc=True)
+            entity_df = entity_df[
+                (entity_df[entity_df_event_timestamp_col] >= start_date)
+                & (entity_df[entity_df_event_timestamp_col] < end_date)
+            ]
+        elif not (start_date is None and end_date is None):
+            raise Exception(
+                "Please provide both 'start_date' and 'end_date', or neither."
+            )
+
+        return FileOfflineStore.get_historical_features(
+            config,
+            feature_views,
+            feature_refs,
+            entity_df,
+            registry,
+            project,
+            full_feature_names,
+        )
 
     @staticmethod
     def pull_latest_from_table_or_query(

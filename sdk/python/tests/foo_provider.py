@@ -67,6 +67,20 @@ class FooProvider(Provider):
     ) -> RetrievalJob:
         pass
 
+    def get_historical_features_by_view(
+        self,
+        config: RepoConfig,
+        feature_views: List[FeatureView],
+        feature_refs: List[str],
+        entity_df: Union[pandas.DataFrame, str],
+        registry: Registry,
+        project: str,
+        start_date: Optional[datetime],
+        end_date: Optional[datetime],
+        full_feature_names: bool,
+    ) -> RetrievalJob:
+        pass
+
     def online_read(
         self,
         config: RepoConfig,

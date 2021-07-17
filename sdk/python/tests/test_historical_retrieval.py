@@ -346,6 +346,113 @@ def test_historical_features_from_parquet_sources(
         )
 
 
+@pytest.mark.parametrize(
+    "entity_df,entity_id,feature_refs",
+    [
+        (
+            "driver_stats",
+            "driver_id",
+            ["driver_stats:conv_rate", "driver_stats:avg_daily_trips"],
+        ),
+        (
+            "customer_profile",
+            "customer_id",
+            [
+                "customer_profile:current_balance",
+                "customer_profile:avg_passenger_count",
+                "customer_profile:lifetime_trip_count",
+            ],
+        ),
+    ],
+)
+@pytest.mark.parametrize(
+    "entity_start_date,entity_end_date",
+    [(None, None), (timedelta(days=-7), timedelta(days=-1))],
+)
+def test_historical_features_from_parquet_sources_infer_entity_df(
+    entity_df, entity_id, feature_refs, entity_start_date, entity_end_date
+):
+    start_date = datetime.now().replace(microsecond=0, second=0, minute=0)
+    (customer_entities, driver_entities, end_date, _, start_date,) = generate_entities(
+        start_date, True
+    )
+
+    with TemporaryDirectory() as temp_dir:
+        driver_df = driver_data.create_driver_hourly_stats_df(
+            driver_entities, start_date, end_date
+        )
+        driver_source = stage_driver_hourly_stats_parquet_source(temp_dir, driver_df)
+        driver_fv = create_driver_hourly_stats_feature_view(driver_source)
+        customer_df = driver_data.create_customer_daily_profile_df(
+            customer_entities, start_date, end_date
+        )
+        customer_source = stage_customer_daily_profile_parquet_source(
+            temp_dir, customer_df
+        )
+        customer_fv = create_customer_daily_profile_feature_view(customer_source)
+        driver = Entity(name="driver", join_key="driver_id", value_type=ValueType.INT64)
+        customer = Entity(name="customer_id", value_type=ValueType.INT64)
+
+        start_date = (
+            start_date + entity_start_date if entity_start_date is not None else None
+        )
+        end_date = end_date + entity_end_date if entity_end_date is not None else None
+
+        store = FeatureStore(
+            config=RepoConfig(
+                registry=os.path.join(temp_dir, "registry.db"),
+                project="default",
+                provider="local",
+                online_store=SqliteOnlineStoreConfig(
+                    path=os.path.join(temp_dir, "online_store.db")
+                ),
+            )
+        )
+
+        store.apply([driver, customer, driver_fv, customer_fv])
+
+        job_implicit = store.get_historical_features_by_view(
+            entity_df=entity_df,
+            feature_refs=feature_refs,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+        target_df = driver_df if entity_df == "driver_stats" else customer_df
+        target_df = target_df[[entity_id, "datetime"]].rename(
+            columns={"datetime": DEFAULT_ENTITY_DF_EVENT_TIMESTAMP_COL}
+        )
+        target_df[DEFAULT_ENTITY_DF_EVENT_TIMESTAMP_COL] = pd.to_datetime(
+            target_df[DEFAULT_ENTITY_DF_EVENT_TIMESTAMP_COL], utc=True
+        )
+        if not (start_date is None and end_date is None):
+            target_df = target_df[
+                (
+                    target_df[DEFAULT_ENTITY_DF_EVENT_TIMESTAMP_COL]
+                    >= pd.to_datetime(start_date, utc=True)
+                )
+                & (
+                    target_df[DEFAULT_ENTITY_DF_EVENT_TIMESTAMP_COL]
+                    < pd.to_datetime(end_date, utc=True)
+                )
+            ]
+        job_explicit = store.get_historical_features(
+            entity_df=target_df, feature_refs=feature_refs,
+        )
+
+        implicit_df = job_implicit.to_df()
+        explicit_df = job_explicit.to_df()
+
+        assert_frame_equal(
+            implicit_df.sort_values(
+                by=[DEFAULT_ENTITY_DF_EVENT_TIMESTAMP_COL, entity_id]
+            ).reset_index(drop=True),
+            explicit_df.sort_values(
+                by=[DEFAULT_ENTITY_DF_EVENT_TIMESTAMP_COL, entity_id]
+            ).reset_index(drop=True),
+        )
+
+
 @pytest.mark.integration
 @pytest.mark.parametrize(
     "provider_type", ["local", "gcp", "gcp_custom_offline_config"],
