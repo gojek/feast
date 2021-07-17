@@ -300,11 +300,16 @@ def _python_value_to_proto_value(feast_value_type, value) -> ProtoValue:
 def python_value_to_proto_value(
     value: Any, feature_type: ValueType = None
 ) -> ProtoValue:
-    value_type = (
-        python_type_to_feast_value_type("", value)
-        if value is not None
-        else feature_type
-    )
+    value_type = feature_type
+    if value is not None:
+        if type(value).__name__ == "ndarray" or isinstance(value, list):
+            value_type = (
+                feature_type
+                if len(value) == 0
+                else python_type_to_feast_value_type("", value)
+            )
+        else:
+            value_type = python_type_to_feast_value_type("", value)
     return _python_value_to_proto_value(value_type, value)
 
 
