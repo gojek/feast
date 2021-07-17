@@ -737,10 +737,9 @@ def _print_materialization_log(
 
 
 def _validate_feature_views(feature_views: List[FeatureView]):
-    """Check FeatureView names are unique"""
+    """ Verify feature views have unique names"""
     name_to_fv_dict = {}
     for fv in feature_views:
-        # Verify FeatureViews have unique names
         if fv.name in name_to_fv_dict:
             raise ValueError(
                 f"More than one feature view with name {fv.name} found. Please ensure that all feature view names are unique."
