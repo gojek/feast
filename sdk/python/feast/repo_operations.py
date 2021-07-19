@@ -12,6 +12,7 @@ import click
 from click.exceptions import BadParameter
 
 from feast import Entity, FeatureTable
+from feast.feature_store import FeatureStore
 from feast.feature_view import FeatureView
 from feast.inference import (
     update_data_sources_with_inferred_event_timestamp_col,
@@ -242,23 +243,9 @@ def apply_total(repo_config: RepoConfig, repo_path: Path, skip_source_validation
 
 @log_exceptions_and_usage
 def teardown(repo_config: RepoConfig, repo_path: Path):
-    registry_config = repo_config.get_registry_config()
-    registry = Registry(
-        registry_path=registry_config.path,
-        repo_path=repo_path,
-        cache_ttl=timedelta(seconds=registry_config.cache_ttl_seconds),
-    )
-    project = repo_config.project
-    registry_tables: List[Union[FeatureTable, FeatureView]] = []
-    registry_tables.extend(registry.list_feature_tables(project=project))
-    registry_tables.extend(registry.list_feature_views(project=project))
-
-    registry_entities: List[Entity] = registry.list_entities(project=project)
-
-    infra_provider = get_provider(repo_config, repo_path)
-    infra_provider.teardown_infra(
-        project, tables=registry_tables, entities=registry_entities
-    )
+    # Cannot pass in both repo_path and repo_config to FeatureStore.
+    feature_store = FeatureStore(repo_path=repo_path, config=None)
+    feature_store.teardown()
 
 
 @log_exceptions_and_usage

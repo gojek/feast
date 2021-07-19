@@ -181,6 +181,8 @@ def prep_redshift_fs_and_fv(
 
         yield fs, fv
 
+        fs.teardown()
+
     # Clean up the uploaded Redshift table
     aws_utils.execute_redshift_statement(
         client,
