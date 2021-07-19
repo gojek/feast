@@ -75,7 +75,6 @@ class Registry:
                 f"Registry path {registry_path} has unsupported scheme {uri.scheme}. Supported schemes are file and gs."
             )
         self.cached_registry_proto_ttl = cache_ttl
-        return
 
     def _initialize_registry(self):
         """Explicitly initializes the registry with an empty proto."""
@@ -111,7 +110,6 @@ class Registry:
         self.cached_registry_proto.entities.append(entity_proto)
         if commit:
             self.commit()
-        return
 
     def list_entities(self, project: str, allow_cache: bool = False) -> List[Entity]:
         """
@@ -179,7 +177,6 @@ class Registry:
         self.cached_registry_proto.feature_tables.append(feature_table_proto)
         if commit:
             self.commit()
-        return
 
     def apply_feature_view(
         self, feature_view: FeatureView, project: str, commit: bool = True
@@ -215,7 +212,6 @@ class Registry:
         self.cached_registry_proto.feature_views.append(feature_view_proto)
         if commit:
             self.commit()
-        return
 
     def apply_materialization(
         self,
@@ -505,7 +501,6 @@ class LocalRegistryStore(RegistryStore):
 
     def update_registry_proto(self, registry_proto: RegistryProto):
         self._write_registry(registry_proto)
-        return
 
     def teardown(self):
         try:
@@ -514,7 +509,6 @@ class LocalRegistryStore(RegistryStore):
             # If the file deletion fails with FileNotFoundError, the file has already
             # been deleted.
             pass
-        return
 
     def _write_registry(self, registry_proto: RegistryProto):
         registry_proto.version_id = str(uuid.uuid4())
@@ -522,7 +516,6 @@ class LocalRegistryStore(RegistryStore):
         file_dir = self._filepath.parent
         file_dir.mkdir(exist_ok=True)
         self._filepath.write_bytes(registry_proto.SerializeToString())
-        return
 
 
 class GCSRegistryStore(RegistryStore):
@@ -538,7 +531,6 @@ class GCSRegistryStore(RegistryStore):
         self._uri = urlparse(uri)
         self._bucket = self._uri.hostname
         self._blob = self._uri.path.lstrip("/")
-        return
 
     def get_registry_proto(self):
         from google.cloud import storage
@@ -565,7 +557,6 @@ class GCSRegistryStore(RegistryStore):
 
     def update_registry_proto(self, registry_proto: RegistryProto):
         self._write_registry(registry_proto)
-        return
 
     def teardown(self):
         gs_bucket = self.gcs_client.get_bucket(self._bucket)
@@ -574,7 +565,6 @@ class GCSRegistryStore(RegistryStore):
         except NotFound:
             # If the blob deletion fails with NotFound, it has already been deleted.
             pass
-        return
 
     def _write_registry(self, registry_proto: RegistryProto):
         registry_proto.version_id = str(uuid.uuid4())
@@ -586,7 +576,6 @@ class GCSRegistryStore(RegistryStore):
         file_obj.write(registry_proto.SerializeToString())
         file_obj.seek(0)
         blob.upload_from_file(file_obj)
-        return
 
 
 class S3RegistryStore(RegistryStore):
@@ -639,11 +628,9 @@ class S3RegistryStore(RegistryStore):
 
     def update_registry_proto(self, registry_proto: RegistryProto):
         self._write_registry(registry_proto)
-        return
 
     def teardown(self):
         self.s3_client.Object(self._bucket, self._key).delete()
-        return
 
     def _write_registry(self, registry_proto: RegistryProto):
         registry_proto.version_id = str(uuid.uuid4())
